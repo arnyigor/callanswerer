@@ -6,24 +6,32 @@
     android:orientation="vertical"
     tools:context=".presentation.MainFragment">
 
-    <TextView
-        android:id="@+id/tvPlay"
-        style="@style/TextAppearance.Material3.BodyLarge"
+    <Button
+        android:id="@+id/btnPlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="8dp"
         android:layout_marginTop="8dp"
         android:gravity="center"
         android:padding="8dp"
-        android:text="@string/play"
-        android:textSize="24sp" />
+        android:text="@string/start" />
+
+    <TextView
+        android:id="@+id/tvInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginTop="8dp"
+        android:padding="8dp"
+        android:text="@string/info"
+        android:textSize="18sp" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvFiles"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        tools:listitem="@layout/i_file_item"
         android:layout_marginHorizontal="8dp"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="8dp"
+        tools:listitem="@layout/i_file_item" />
 
 </LinearLayout>

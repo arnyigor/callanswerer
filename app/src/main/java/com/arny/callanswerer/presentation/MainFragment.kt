@@ -17,11 +17,11 @@ import com.arny.callanswerer.di.appComponent
 import com.arny.callanswerer.presentation.extentions.requestPermission
 import com.arny.callanswerer.presentation.extentions.safeWith
 import javax.inject.Inject
+import kotlin.properties.Delegates
 
 class MainFragment : Fragment() {
     private var filesListAdapter: FilesListAdapter? = null
     private var binding: FragmentMainBinding? = null
-    private var voiceDemoAnalyzer: VoiceDemoAnalyzer? = null
     private val requestPhoneState = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         requestReadPhoneLog()
     }
@@ -37,6 +37,22 @@ class MainFragment : Fragment() {
 
     @Inject
     lateinit var voiceRecognizer: VoiceRecognizer
+
+    @Inject
+    lateinit var analyzer: VoiceDemoAnalyzer
+
+    private var btnState by Delegates.observable(VoiceRecognizer.RecognizeState.STATE_DESTROED) { _, oldValue, newValue ->
+        if (oldValue != newValue) {
+            binding?.btnPlay?.text = newValue.toString()
+            when (newValue) {
+                VoiceRecognizer.RecognizeState.STATE_READY,
+                VoiceRecognizer.RecognizeState.STATE_DONE,
+                VoiceRecognizer.RecognizeState.STATE_MIC,
+                -> binding?.btnPlay?.isEnabled = true
+                else -> binding?.btnPlay?.isEnabled = false
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,8 +82,12 @@ class MainFragment : Fragment() {
             }
             rvFiles.layoutManager = LinearLayoutManager(requireContext(), RecyclerView.VERTICAL, false)
             rvFiles.adapter = filesListAdapter
-            tvPlay.setOnClickListener {
-                voiceRecognizer.recognize()
+            btnPlay.setOnClickListener {
+                if (voiceRecognizer.state == VoiceRecognizer.RecognizeState.STATE_MIC) {
+                    voiceRecognizer.stopRecognize()
+                } else {
+                    voiceRecognizer.recognize()
+                }
             }
         }
         requestReadPhoneState {
@@ -112,25 +132,18 @@ class MainFragment : Fragment() {
 
     private fun initPlayer() {
         val allFiles = player.getAllFiles()
-        voiceDemoAnalyzer = VoiceDemoAnalyzer()
         filesListAdapter?.submitList(allFiles)
-
         with(voiceRecognizer) {
             setErrorChange {
-                binding?.tvPlay?.text = "ERROR:$it"
+                binding?.tvInfo?.text = "ERROR:$it"
             }
             setStateChange {
-                when (it) {
-                    VoiceRecognizer.RecognizeState.STATE_START -> binding?.tvPlay?.text = "STATE_START"
-                    VoiceRecognizer.RecognizeState.STATE_READY -> binding?.tvPlay?.text = "STATE_READY"
-                    VoiceRecognizer.RecognizeState.STATE_DONE -> binding?.tvPlay?.text = "STATE_DONE"
-                    VoiceRecognizer.RecognizeState.STATE_MIC -> binding?.tvPlay?.text = "STATE_MIC"
-                    VoiceRecognizer.RecognizeState.STATE_DESTROED -> binding?.tvPlay?.text = "STATE_DESTROED"
-                }
+                btnState = it
             }
             setTextResult { text ->
-                val analyze = voiceDemoAnalyzer?.analyze(text)
-                if (!analyze.isNullOrBlank()) {
+                binding?.tvInfo?.text = text
+                val analyze = analyzer.analyze(text)
+                if (analyze.isNotBlank()) {
                     playFile(analyze)
                 }
             }

@@ -18,8 +18,13 @@ class VoiceRecognizer @Inject constructor(
         STATE_READY,
         STATE_DONE,
         STATE_MIC,
-        STATE_DESTROED
+        STATE_DESTROED,
+        STATE_ERROR
     }
+
+    var state: RecognizeState = RecognizeState.STATE_DESTROED
+        private set
+
     private var onTextResult: (message: String) -> Unit = {}
     private var onStateChange: (state: RecognizeState) -> Unit = {}
     private var onError: (message: String?) -> Unit = {}
@@ -27,48 +32,55 @@ class VoiceRecognizer @Inject constructor(
     private var speechService: SpeechService? = null
     private var speechStreamService: SpeechStreamService? = null
 
-    fun setTextResult(result: (message: String) -> Unit){
+    fun setTextResult(result: (message: String) -> Unit) {
         this.onTextResult = result
     }
 
-    fun setStateChange(state: (state: RecognizeState) -> Unit){
+    fun setStateChange(state: (state: RecognizeState) -> Unit) {
         this.onStateChange = state
     }
 
-    fun setErrorChange(error: (message: String?) -> Unit){
+    fun setErrorChange(error: (message: String?) -> Unit) {
         this.onError = error
     }
 
     fun init() {
-        onStateChange(RecognizeState.STATE_START)
+        changeState(RecognizeState.STATE_START)
         StorageService.unpack(
             context,
             "model-ru-ru",
             "model",
             { model: Model? ->
                 this.model = model
-                onStateChange(RecognizeState.STATE_READY)
+                changeState(RecognizeState.STATE_READY)
             }, { exception: IOException ->
+                changeState(RecognizeState.STATE_ERROR)
                 onError("Failed to unpack the model" + exception.message)
             }
         )
     }
 
+    private fun changeState(recognizeState: RecognizeState) {
+        state = recognizeState
+        onStateChange(recognizeState)
+    }
+
     fun stopRecognize() {
         if (speechService != null) {
-            onStateChange(RecognizeState.STATE_DONE)
+            changeState(RecognizeState.STATE_DONE)
             speechService?.stop()
             speechService = null
         }
     }
 
     fun recognize() {
-        onStateChange(RecognizeState.STATE_MIC)
         try {
             val rec = Recognizer(model, 16000.0f)
             speechService = SpeechService(rec, 16000.0f)
             speechService?.startListening(this)
+            changeState(RecognizeState.STATE_MIC)
         } catch (e: IOException) {
+            changeState(RecognizeState.STATE_DESTROED)
             onError(e.message)
         }
     }
@@ -98,7 +110,7 @@ class VoiceRecognizer @Inject constructor(
     override fun onFinalResult(hypothesis: String?) {
         onStateChange(RecognizeState.STATE_DONE)
         if (speechStreamService != null) {
-            speechStreamService = null;
+            speechStreamService = null
         }
     }
 
