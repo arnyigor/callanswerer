@@ -11,6 +11,18 @@ fun <T : ViewBinding> T?.safeWith(init: T.() -> Unit = {}) {
     this?.let { with(it) { init() } }
 }
 
+fun Fragment.checkPermissions(permissions: Array<String>): Boolean {
+    var result: Int
+    val listPermissionsNeeded = mutableListOf<String>()
+    for (p in permissions) {
+        result = ContextCompat.checkSelfPermission(requireContext(), p)
+        if (result != PackageManager.PERMISSION_GRANTED) {
+            listPermissionsNeeded.add(p)
+        }
+    }
+    return listPermissionsNeeded.isEmpty()
+}
+
 fun <T> Fragment.requestPermission(
     resultLauncher: ActivityResultLauncher<T>,
     permission: String,

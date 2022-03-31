@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -14,7 +15,7 @@ import com.arny.callanswerer.data.voice.VoiceDemoAnalyzer
 import com.arny.callanswerer.data.voice.VoiceRecognizer
 import com.arny.callanswerer.databinding.FragmentMainBinding
 import com.arny.callanswerer.di.appComponent
-import com.arny.callanswerer.presentation.extentions.requestPermission
+import com.arny.callanswerer.presentation.extentions.checkPermissions
 import com.arny.callanswerer.presentation.extentions.safeWith
 import javax.inject.Inject
 import kotlin.properties.Delegates
@@ -22,15 +23,19 @@ import kotlin.properties.Delegates
 class MainFragment : Fragment() {
     private var filesListAdapter: FilesListAdapter? = null
     private var binding: FragmentMainBinding? = null
-    private val requestPhoneState = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        requestReadPhoneLog()
-    }
-    private val requestLog = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        requestAudioPermission()
-    }
-    private val requestAudio = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        initPlayer()
-    }
+    private val permissions = arrayOf(
+        Manifest.permission.READ_PHONE_STATE,
+        Manifest.permission.READ_CALL_LOG,
+        Manifest.permission.RECORD_AUDIO
+    )
+    private val requestPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { map ->
+            if (map.map { it.value }.all { it }) {
+                initPlayer()
+            } else {
+                Toast.makeText(requireContext(), "Need all permissions", Toast.LENGTH_SHORT).show()
+            }
+        }
 
     @Inject
     lateinit var player: Player
@@ -40,7 +45,6 @@ class MainFragment : Fragment() {
 
     @Inject
     lateinit var analyzer: VoiceDemoAnalyzer
-
     private var btnState by Delegates.observable(VoiceRecognizer.RecognizeState.STATE_DESTROED) { _, oldValue, newValue ->
         if (oldValue != newValue) {
             binding?.btnPlay?.text = newValue.toString()
@@ -80,23 +84,26 @@ class MainFragment : Fragment() {
             filesListAdapter = FilesListAdapter {
                 playFile(it)
             }
-            rvFiles.layoutManager = LinearLayoutManager(requireContext(), RecyclerView.VERTICAL, false)
+            rvFiles.layoutManager =
+                LinearLayoutManager(requireContext(), RecyclerView.VERTICAL, false)
             rvFiles.adapter = filesListAdapter
             btnPlay.setOnClickListener {
-                if (voiceRecognizer.state == VoiceRecognizer.RecognizeState.STATE_MIC) {
-                    voiceRecognizer.stopRecognize()
+                if (checkPermissions(permissions)) {
+                    if (voiceRecognizer.state == VoiceRecognizer.RecognizeState.STATE_MIC) {
+                        voiceRecognizer.stopRecognize()
+                    } else {
+                        voiceRecognizer.recognize()
+                    }
                 } else {
-                    voiceRecognizer.recognize()
+                    requestPermissions()
                 }
             }
         }
-        requestReadPhoneState {
-            requestReadPhoneLog {
-                requestAudioPermission {
-                    initPlayer()
-                }
-            }
-        }
+        requestPermissions()
+    }
+
+    private fun requestPermissions() {
+        requestPermissions.launch(permissions)
     }
 
     private fun playFile(it: String) {
@@ -104,30 +111,6 @@ class MainFragment : Fragment() {
         player.playFile(name = it) {
             voiceRecognizer.pause(false)
         }
-    }
-
-    private fun requestReadPhoneState(onResult: (input: String) -> Unit = {}) {
-        requestPermission(
-            requestPhoneState,
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.READ_PHONE_STATE, onResult
-        )
-    }
-
-    private fun requestReadPhoneLog(onResult: (input: String) -> Unit = {}) {
-        requestPermission(
-            requestLog,
-            Manifest.permission.READ_CALL_LOG,
-            Manifest.permission.READ_CALL_LOG, onResult
-        )
-    }
-
-    private fun requestAudioPermission(onResult: (input: String) -> Unit = {}) {
-        requestPermission(
-            requestAudio,
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.RECORD_AUDIO, onResult
-        )
     }
 
     private fun initPlayer() {
